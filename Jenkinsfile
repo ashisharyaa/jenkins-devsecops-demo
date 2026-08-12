@@ -86,7 +86,7 @@ pipeline {
     post {
         success {
             echo 'Pipeline completed successfully!'
-            echo 'Application is available on http://localhost:5000'
+            echo 'Application is available on http://localhost:7000'
         }
 
         failure {
