@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "jenkins-devsecops-demo"
-        IMAGE_TAG  = "1.0"
+        IMAGE_TAG = "${BUILD_NUMBER}"
         CONTAINER_NAME = "devsecops-app"
     }
 
@@ -38,10 +38,14 @@ pipeline {
             steps {
                 sh '''
                     echo "===== Docker Build ====="
+                    echo "Building image: ${IMAGE_NAME}:${IMAGE_TAG}"
 
                     docker build \
                       -t ${IMAGE_NAME}:${IMAGE_TAG} \
                       .
+
+                    echo "===== Image Created ====="
+                    docker images ${IMAGE_NAME}
                 '''
             }
         }
@@ -50,6 +54,7 @@ pipeline {
             steps {
                 sh '''
                     echo "===== Trivy Security Scan ====="
+                    echo "Scanning: ${IMAGE_NAME}:${IMAGE_TAG}"
 
                     trivy image \
                       --scanners vuln \
@@ -73,10 +78,10 @@ pipeline {
                     echo "Starting new container..."
                     docker run -d \
                       --name ${CONTAINER_NAME} \
-                      -p 7000:7000 \
+                      -p 8000:5000 \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
-                    echo "===== Running Containers ====="
+                    echo "===== Running Container ====="
                     docker ps
                 '''
             }
@@ -85,12 +90,17 @@ pipeline {
 
     post {
         success {
+            echo '======================================'
             echo 'Pipeline completed successfully!'
-            echo 'Application is available on http://localhost:7000'
+            echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo 'Application: http://localhost:8000'
+            echo '======================================'
         }
 
         failure {
-            echo 'Pipeline failed!'
+            echo '======================================'
+            echo 'Pipeline FAILED!'
+            echo '======================================'
         }
     }
 }
