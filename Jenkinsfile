@@ -78,7 +78,7 @@ pipeline {
                     echo "Starting new container..."
                     docker run -d \
                       --name ${CONTAINER_NAME} \
-                      -p 8000:5000 \
+                      -p 8000:7000 \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
                     echo "===== Running Container ====="
