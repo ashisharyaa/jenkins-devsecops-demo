@@ -64,7 +64,7 @@ pipeline {
             }
         }
 
-        stage('Docker Hub Push') {
+        stage('Docker Hub Push & Deploy') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -86,46 +86,47 @@ pipeline {
                           ${IMAGE_NAME}:${IMAGE_TAG} \
                           ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        echo "===== Pushing Image ====="
+                        echo "===== Pushing Image To Docker Hub ====="
 
                         docker push \
                           ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        echo "===== Docker Hub Push Completed ====="
+                        echo "===== Pulling Image From Docker Hub ====="
+
+                        docker pull \
+                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+
+                        echo "===== Stopping Old Container ====="
+
+                        docker stop ${CONTAINER_NAME} || true
+
+                        echo "===== Removing Old Container ====="
+
+                        docker rm ${CONTAINER_NAME} || true
+
+                        echo "===== Starting Container From Docker Hub ====="
+
+                        docker run -d \
+                          --name ${CONTAINER_NAME} \
+                          -p 8000:5000 \
+                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+
+                        echo "===== Removing Old Local Images ====="
+
+                        docker images "${IMAGE_NAME}" \
+                          --format "{{.Repository}}:{{.Tag}}" \
+                          | grep -v "^${IMAGE_NAME}:${IMAGE_TAG}$" \
+                          | xargs -r docker rmi || true
+
+                        echo "===== Running Container ====="
+
+                        docker ps
+
+                        echo "===== Docker Hub Logout ====="
 
                         docker logout
                     '''
                 }
-            }
-        }
-
-        stage('Docker Run') {
-            steps {
-                sh '''
-                    echo "===== Deploy Application ====="
-
-                    echo "Stopping old container..."
-                    docker stop ${CONTAINER_NAME} || true
-
-                    echo "Removing old container..."
-                    docker rm ${CONTAINER_NAME} || true
-
-                    echo "Starting new container..."
-                    docker run -d \
-                      --name ${CONTAINER_NAME} \
-                      -p 8000:7000 \
-                      ${IMAGE_NAME}:${IMAGE_TAG}
-
-                    echo "===== Removing Old Images ====="
-
-                    docker images "${IMAGE_NAME}" \
-                      --format "{{.Repository}}:{{.Tag}}" \
-                      | grep -v "^${IMAGE_NAME}:${IMAGE_TAG}$" \
-                      | xargs -r docker rmi || true
-
-                    echo "===== Running Container ====="
-                    docker ps
-                '''
             }
         }
     }
@@ -135,6 +136,7 @@ pipeline {
             echo '======================================'
             echo 'Pipeline completed successfully!'
             echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo 'Image deployed from Docker Hub'
             echo 'Application: http://localhost:8000'
             echo '======================================'
         }
