@@ -81,6 +81,13 @@ pipeline {
                       -p 8000:7000 \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
+                    echo "===== Removing Old Images ====="
+
+                    docker images "${IMAGE_NAME}" \
+                      --format "{{.Repository}}:{{.Tag}}" \
+                      | grep -v "^${IMAGE_NAME}:${IMAGE_TAG}$" \
+                      | xargs -r docker rmi || true
+
                     echo "===== Running Container ====="
                     docker ps
                 '''
