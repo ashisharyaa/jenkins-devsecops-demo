@@ -64,6 +64,7 @@ pipeline {
                       --severity CRITICAL \
                       --exit-code 1 \
                       --timeout 10m \
+                      --skip-version-check \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
                     echo "===== Trivy Security Gate Passed ====="
