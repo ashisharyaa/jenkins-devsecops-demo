@@ -1,4 +1,3 @@
-// building and deploying python based app in docker using jenkins pipeline
 pipeline {
     agent any
 
@@ -6,6 +5,8 @@ pipeline {
         IMAGE_NAME = "jenkins-devsecops-demo"
         IMAGE_TAG = "${BUILD_NUMBER}"
         CONTAINER_NAME = "devsecops-app"
+
+        DOCKERHUB = credentials('dockerhub-credentials')
     }
 
     stages {
@@ -30,7 +31,8 @@ pipeline {
             steps {
                 sh '''
                     echo "===== Checkout ====="
-                    ls -la
+                    git branch --show-current
+                    git log -1 --oneline
                 '''
             }
         }
@@ -51,7 +53,7 @@ pipeline {
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy Security Gate') {
             steps {
                 sh '''
                     echo "===== Trivy Security Scan ====="
@@ -59,75 +61,78 @@ pipeline {
 
                     trivy image \
                       --scanners vuln \
+                      --severity CRITICAL \
+                      --exit-code 1 \
                       --timeout 10m \
                       ${IMAGE_NAME}:${IMAGE_TAG}
+
+                    echo "===== Trivy Security Gate Passed ====="
                 '''
             }
         }
 
-        stage('Docker Hub Push & Deploy') {
+        stage('Docker Hub Push') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        echo "===== Docker Hub Login ====="
+                sh '''
+                    echo "===== Docker Hub Login ====="
 
-                        echo "$DOCKER_PASSWORD" | docker login \
-                          -u "$DOCKER_USERNAME" \
-                          --password-stdin
+                    echo "$DOCKERHUB_PSW" | docker login \
+                      -u "$DOCKERHUB_USR" \
+                      --password-stdin
 
-                        echo "===== Tagging Image ====="
+                    echo "===== Tagging Image ====="
 
-                        docker tag \
-                          ${IMAGE_NAME}:${IMAGE_TAG} \
-                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag \
+                      ${IMAGE_NAME}:${IMAGE_TAG} \
+                      ${DOCKERHUB_USR}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        echo "===== Pushing Image To Docker Hub ====="
+                    echo "===== Pushing Image To Docker Hub ====="
 
-                        docker push \
-                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push \
+                      ${DOCKERHUB_USR}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        echo "===== Pulling Image From Docker Hub ====="
+                    echo "===== Docker Hub Push Completed ====="
+                '''
+            }
+        }
 
-                        docker pull \
-                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+        stage('Docker Deploy') {
+            steps {
+                sh '''
+                    echo "===== Pulling Image From Docker Hub ====="
 
-                        echo "===== Stopping Old Container ====="
+                    docker pull \
+                      ${DOCKERHUB_USR}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        docker stop ${CONTAINER_NAME} || true
+                    echo "===== Stopping Old Container ====="
 
-                        echo "===== Removing Old Container ====="
+                    docker stop ${CONTAINER_NAME} || true
 
-                        docker rm ${CONTAINER_NAME} || true
+                    echo "===== Removing Old Container ====="
 
-                        echo "===== Starting Container From Docker Hub ====="
+                    docker rm ${CONTAINER_NAME} || true
 
-                        docker run -d \
-                          --name ${CONTAINER_NAME} \
-                          -p 9000:7000 \
-                          ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
+                    echo "===== Starting Container From Docker Hub ====="
 
-                        echo "===== Removing Old Local Images ====="
+                    docker run -d \
+                      --name ${CONTAINER_NAME} \
+                      -p 8000:7000 \
+                      ${DOCKERHUB_USR}/${IMAGE_NAME}:${IMAGE_TAG}
 
-                        docker images "${IMAGE_NAME}" \
-                          --format "{{.Repository}}:{{.Tag}}" \
-                          | grep -v "^${IMAGE_NAME}:${IMAGE_TAG}$" \
-                          | xargs -r docker rmi || true
+                    echo "===== Removing Old Local Images ====="
 
-                        echo "===== Running Container ====="
+                    docker images "${IMAGE_NAME}" \
+                      --format "{{.Repository}}:{{.Tag}}" \
+                      | grep -v "^${IMAGE_NAME}:${IMAGE_TAG}$" \
+                      | xargs -r docker rmi || true
 
-                        docker ps
+                    echo "===== Running Container ====="
 
-                        echo "===== Docker Hub Logout ====="
+                    docker ps
 
-                        docker logout
-                    '''
-                }
+                    echo "===== Application ====="
+                    echo "http://localhost:8000"
+                '''
             }
         }
     }
@@ -137,7 +142,8 @@ pipeline {
             echo '======================================'
             echo 'Pipeline completed successfully!'
             echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
-            echo 'Image deployed from Docker Hub'
+            echo 'Image pushed to Docker Hub'
+            echo 'Image pulled from Docker Hub'
             echo 'Application: http://localhost:8000'
             echo '======================================'
         }
@@ -145,6 +151,7 @@ pipeline {
         failure {
             echo '======================================'
             echo 'Pipeline FAILED!'
+            echo 'Check the failed stage above.'
             echo '======================================'
         }
     }
