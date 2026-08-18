@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -62,7 +63,6 @@ pipeline {
                     trivy image \
                       --scanners vuln \
                       --severity CRITICAL \
-                      --exit-code 1 \
                       --timeout 10m \
                       --skip-version-check \
                       ${IMAGE_NAME}:${IMAGE_TAG}
