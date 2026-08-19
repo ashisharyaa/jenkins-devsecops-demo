@@ -64,6 +64,7 @@ pipeline {
                       --scanners vuln \
                       --severity CRITICAL \
                       --timeout 10m \
+                      --exit-code 1 \
                       --skip-version-check \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
