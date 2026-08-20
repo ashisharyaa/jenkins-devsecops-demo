@@ -1,4 +1,4 @@
-// doing security check
+// doing security check via cicd
 pipeline {
     agent any
 
