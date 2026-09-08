@@ -8,6 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 
-EXPOSE 7070
+EXPOSE 7000
 
 CMD ["python", "app.py"]
