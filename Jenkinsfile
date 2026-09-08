@@ -109,7 +109,7 @@ pipeline {
 
                         docker run -d \
                           --name ${CONTAINER_NAME} \
-                          -p 9000:7000 \
+                          -p 9001:7000 \
                           ${DOCKER_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}
 
                         echo "===== Removing Old Local Images ====="
